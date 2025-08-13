@@ -51,6 +51,10 @@ void __error__(char *pcFilename, uint32_t ui32Line) {
 //*****************************************************************************
 // Global Variables
 //*****************************************************************************
+/**
+ * @brief Counts the number of triggers (rising edges) received on PC4.
+ */
+volatile uint32_t g_TriggerCount = 0;
 
 /**
  * @brief Microsecond counter incremented by Timer0A interrupt.
@@ -259,6 +263,8 @@ void LCD_PrintString(char* str) {
  * It also displays the timestamp on the LCD.
  */
 void GPIOCIntHandler(void) {
+    // Increment trigger count
+    g_TriggerCount++;
     GPIOIntClear(GPIO_PORTC_BASE, GPIO_PIN_4); // Clear interrupt flag
 
     // --- UART Output (existing functionality) ---
@@ -277,6 +283,23 @@ void GPIOCIntHandler(void) {
         temp_counter /= 10;
     }
 
+    // Prepare trigger count string
+    char trigger_str[12];
+    int trig_i = 11;
+    trigger_str[trig_i] = '\0';
+    trig_i--;
+    uint32_t temp_trig = g_TriggerCount;
+    for (; trig_i >= 0; trig_i--) {
+        trigger_str[trig_i] = '0' + (temp_trig % 10);
+        temp_trig /= 10;
+        if (temp_trig == 0 && trig_i > 0) {
+            // Pad with spaces for alignment
+            int k;
+            for (k = trig_i - 1; k >= 0; k--) trigger_str[k] = ' ';
+            break;
+        }
+    }
+
     LCD_SendCommand(0x01); // Clear display
     // IMPORTANT: Longer delay required for clear display command to complete (~2ms)
     SysCtlDelay(SysCtlClockGet() / 500); // 50 MHz / 500 = 100,000 cycles, approx 2ms
@@ -292,6 +315,14 @@ void GPIOCIntHandler(void) {
     // Set cursor to the second line, first column
     LCD_SendCommand(0xC0);
     LCD_PrintString(timestamp_str);
+
+    // Set cursor to the third line, first column
+    LCD_SendCommand(0x94); // 0x94 = 3rd line, 1st col for 20x4 LCD
+    LCD_PrintString("Triggers:");
+
+    // Set cursor to the fourth line, first column
+    LCD_SendCommand(0xD4); // 0xD4 = 4th line, 1st col for 20x4 LCD
+    LCD_PrintString(trigger_str);
 }
 
 //*****************************************************************************
