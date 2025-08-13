@@ -18,26 +18,19 @@
  * This is part of revision 2.2.0.295 of the EK-TM4C123GXL Firmware Package.
  *****************************************************************************/
 
-#include <stdint.h>      // Standard integer types
-#include <stdbool.h>     // Standard boolean type
-#include "inc/hw_types.h"   // TivaWare hardware types
-#include "inc/hw_memmap.h"  // Memory map definitions
-#include "driverlib/sysctl.h"    // System control (clock, power)
-#include "driverlib/gpio.h"      // GPIO functions
-#include "driverlib/uart.h"      // UART functions
-#include "driverlib/pin_map.h"   // Pin mapping macros
-#include "driverlib/interrupt.h" // Interrupt controller
-#include "driverlib/timer.h"     // Timer functions
-
-
-//*****************************************************************************
-// Pin definitions for LaunchPad RGB LED (not used in this project, but kept for reference)
-#define RED_LED   GPIO_PIN_1   ///< PF1
-#define BLUE_LED  GPIO_PIN_2   ///< PF2
-#define GREEN_LED GPIO_PIN_3   ///< PF3
+#include <stdint.h>
+#include <stdbool.h>
+#include "inc/hw_types.h"
+#include "inc/hw_memmap.h"
+#include "driverlib/sysctl.h"
+#include "driverlib/gpio.h"
+#include "driverlib/uart.h"
+#include "driverlib/pin_map.h"
+#include "driverlib/interrupt.h"
+#include "driverlib/timer.h"
 
 //*****************************************************************************
-// Error routine called by driver library if an error is encountered (debug only)
+// Error routine called by driver library if an error is encountered (debug)
 //*****************************************************************************
 #ifdef DEBUG
 /**
