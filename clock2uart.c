@@ -299,8 +299,10 @@ void GPIOCIntHandler(void) {
     LCD_SendCommand(0x01); // Clear display
     // IMPORTANT: Longer delay required for clear display command to complete (~2ms)
     SysCtlDelay(SysCtlClockGet() / 500); // 50 MHz / 500 = 100,000 cycles, approx 2ms
-                                         // (50MHz / 500 = 100,000 cycles for 2ms)
-                                         // (50MHz / 30000 in your code was ~0.6ms, might be too short)
+
+    // Return home to ensure cursor is at (0,0) and display is not shifted
+    LCD_SendCommand(0x02); // Return home
+    SysCtlDelay(SysCtlClockGet() / g_LCDNibbleDelayFactor); // Short delay after home
 
     // Set cursor to the first line, first column
     LCD_SendCommand(0x80);
