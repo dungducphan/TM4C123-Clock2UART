@@ -1,159 +1,181 @@
-//*****************************************************************************
-//
-// project0.c - Example to demonstrate minimal TivaWare setup
-//
-// Copyright (c) 2012-2020 Texas Instruments Incorporated.  All rights reserved.
-// Software License Agreement
-// 
-// Texas Instruments (TI) is supplying this software for use solely and
-// exclusively on TI's microcontroller products. The software is owned by
-// TI and/or its suppliers, and is protected under applicable copyright
-// laws. You may not combine this software with "viral" open-source
-// software in order to form a larger program.
-// 
-// THIS SOFTWARE IS PROVIDED "AS IS" AND WITH ALL FAULTS.
-// NO WARRANTIES, WHETHER EXPRESS, IMPLIED OR STATUTORY, INCLUDING, BUT
-// NOT LIMITED TO, IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE APPLY TO THIS SOFTWARE. TI SHALL NOT, UNDER ANY
-// CIRCUMSTANCES, BE LIABLE FOR SPECIAL, INCIDENTAL, OR CONSEQUENTIAL
-// DAMAGES, FOR ANY REASON WHATSOEVER.
-// 
-// This is part of revision 2.2.0.295 of the EK-TM4C123GXL Firmware Package.
-//
-//*****************************************************************************
 
-#include <stdint.h>
-#include <stdbool.h>
-#include "inc/hw_types.h"
-#include "inc/hw_memmap.h"
-#include "driverlib/sysctl.h"
-#include "driverlib/gpio.h"
-#include "driverlib/uart.h"
-#include "driverlib/pin_map.h"
-#include "driverlib/interrupt.h"
-#include "driverlib/timer.h"
+/******************************************************************************
+ * @file    clock2uart.c
+ * @brief   Measures time between rising edges on PC4 and outputs the timestamp
+ *          (in microseconds) over UART0. Uses TivaWare for TM4C123 MCUs.
+ *
+ * This program configures the Tiva C Series microcontroller to:
+ *   - Use Timer0A to count microseconds since boot (us_counter)
+ *   - Set up PC4 as a digital input with interrupt on rising edge
+ *   - Print the current microsecond counter value to UART0 each time a rising
+ *     edge is detected on PC4
+ *   - UART0 is configured for 115200 baud, 8N1, on PA0/PA1
+ *
+ * All main logic is interrupt-driven for accurate timing and low CPU usage.
+ *
+ * Copyright (c) 2012-2020 Texas Instruments Incorporated.  All rights reserved.
+ *
+ * This is part of revision 2.2.0.295 of the EK-TM4C123GXL Firmware Package.
+ *****************************************************************************/
+
+#include <stdint.h>      // Standard integer types
+#include <stdbool.h>     // Standard boolean type
+#include "inc/hw_types.h"   // TivaWare hardware types
+#include "inc/hw_memmap.h"  // Memory map definitions
+#include "driverlib/sysctl.h"    // System control (clock, power)
+#include "driverlib/gpio.h"      // GPIO functions
+#include "driverlib/uart.h"      // UART functions
+#include "driverlib/pin_map.h"   // Pin mapping macros
+#include "driverlib/interrupt.h" // Interrupt controller
+#include "driverlib/timer.h"     // Timer functions
+
 
 //*****************************************************************************
-//
-// Define pin to LED color mapping.
-//
-//*****************************************************************************
+// Pin definitions for LaunchPad RGB LED (not used in this project, but kept for reference)
+#define RED_LED   GPIO_PIN_1   ///< PF1
+#define BLUE_LED  GPIO_PIN_2   ///< PF2
+#define GREEN_LED GPIO_PIN_3   ///< PF3
 
 //*****************************************************************************
-//
-//! \addtogroup example_list
-//! <h1>Project Zero (project0)</h1>
-//!
-//! This example demonstrates the use of TivaWare to setup the clocks and
-//! toggle GPIO pins to make the LED's blink. This is a good place to start
-//! understanding your launchpad and the tools that can be used to program it.
-//
-//*****************************************************************************
-
-#define RED_LED   GPIO_PIN_1
-#define BLUE_LED  GPIO_PIN_2
-#define GREEN_LED GPIO_PIN_3
-
-//*****************************************************************************
-//
-// The error routine that is called if the driver library encounters an error.
-//
+// Error routine called by driver library if an error is encountered (debug only)
 //*****************************************************************************
 #ifdef DEBUG
-void
-__error__(char *pcFilename, uint32_t ui32Line)
-{
+/**
+ * @brief DriverLib error handler (only used in debug builds)
+ * @param pcFilename Source file name where error occurred
+ * @param ui32Line   Line number of error
+ */
+void __error__(char *pcFilename, uint32_t ui32Line) {
+    // User can add breakpoint or error handling here
 }
 #endif
 
 //*****************************************************************************
-//
-// Main 'C' Language entry point.  Toggle an LED using TivaWare.
-//
+// Global Variables
 //*****************************************************************************
 
-
+/**
+ * @brief Microsecond counter incremented by Timer0A interrupt.
+ *
+ * This variable holds the number of microseconds since the timer started.
+ * It is incremented every 1us by the Timer0A interrupt handler.
+ */
 volatile uint64_t us_counter = 0;
 
-// Timer0A interrupt handler: increments microsecond counter
+//*****************************************************************************
+// Interrupt Service Routines (ISRs)
+//*****************************************************************************
+
+/**
+ * @brief Timer0A interrupt handler. Increments the microsecond counter.
+ *
+ * This ISR is triggered every 1 microsecond (based on a 50 MHz system clock).
+ * It clears the interrupt flag and increments the global us_counter.
+ */
 void Timer0AIntHandler(void) {
-    TimerIntClear(TIMER0_BASE, TIMER_TIMA_TIMEOUT);
+    TimerIntClear(TIMER0_BASE, TIMER_TIMA_TIMEOUT); // Clear interrupt flag
     us_counter++;
 }
 
-// Helper: print uint64_t as decimal string over UART0
+/**
+ * @brief Print a 64-bit unsigned integer as a decimal string over UART0.
+ *
+ * @param value The 64-bit unsigned integer to print.
+ *
+ * This function converts the given value to a decimal string and sends it
+ * character by character over UART0. No leading zeros are printed.
+ */
 void UARTPrintUint64(uint64_t value) {
-    char buf[21]; // Enough for 64-bit int
+    char buf[21]; // Buffer to hold digits (max for 64-bit int)
     int i = 0;
     if (value == 0) {
         UARTCharPut(UART0_BASE, '0');
         return;
     }
+    // Extract digits in reverse order
     while (value > 0 && i < 20) {
         buf[i++] = '0' + (value % 10);
         value /= 10;
     }
-    // Print in reverse
+    // Print digits in correct order
     while (i > 0) {
         UARTCharPut(UART0_BASE, buf[--i]);
     }
 }
 
-// Interrupt handler for PC4 (clock input)
+/**
+ * @brief GPIO Port C interrupt handler for PC4 (clock input).
+ *
+ * This ISR is triggered on a rising edge at PC4. It clears the interrupt flag,
+ * prints the current microsecond counter value over UART0, and sends CR+LF.
+ */
 void GPIOCIntHandler(void) {
-    GPIOIntClear(GPIO_PORTC_BASE, GPIO_PIN_4);
-    UARTPrintUint64(us_counter);
-    UARTCharPut(UART0_BASE, '\r');
-    UARTCharPut(UART0_BASE, '\n');
+    GPIOIntClear(GPIO_PORTC_BASE, GPIO_PIN_4); // Clear interrupt flag
+    UARTPrintUint64(us_counter);               // Print timestamp
+    UARTCharPut(UART0_BASE, '\r');            // Carriage return
+    UARTCharPut(UART0_BASE, '\n');            // Line feed
 }
 
+//*****************************************************************************
+// Main Application Entry Point
+//*****************************************************************************
 
+/**
+ * @brief Main function. Initializes peripherals and enters main loop.
+ *
+ * - Sets system clock to 50 MHz using PLL
+ * - Enables and configures GPIOC (PC4), UART0 (PA0/PA1), and Timer0A
+ * - Sets up interrupts for PC4 (rising edge) and Timer0A (1us period)
+ * - All main work is done in ISRs; main loop can optionally sleep
+ *
+ * @return int (never returns)
+ */
 int main(void) {
-    // Set system clock to 50 MHz
-    SysCtlClockSet(SYSCTL_SYSDIV_4|SYSCTL_USE_PLL|SYSCTL_XTAL_16MHZ|SYSCTL_OSC_MAIN);
+    // Set system clock to 50 MHz (16 MHz crystal, PLL, divide by 4)
+    SysCtlClockSet(SYSCTL_SYSDIV_4 | SYSCTL_USE_PLL | SYSCTL_XTAL_16MHZ | SYSCTL_OSC_MAIN);
 
-    // Enable peripherals: GPIOC for input, UART0 for output, Timer0
-    SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOC);
-    SysCtlPeripheralEnable(SYSCTL_PERIPH_UART0);
-    SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOA); // UART0 uses PA0/PA1
-    SysCtlPeripheralEnable(SYSCTL_PERIPH_TIMER0);
+    // Enable required peripherals
+    SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOC);   // For PC4 input
+    SysCtlPeripheralEnable(SYSCTL_PERIPH_UART0);   // For UART0 output
+    SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOA);   // UART0 uses PA0/PA1
+    SysCtlPeripheralEnable(SYSCTL_PERIPH_TIMER0);  // For Timer0A
 
     // Wait for peripherals to be ready
-    while(!SysCtlPeripheralReady(SYSCTL_PERIPH_GPIOC)) {}
-    while(!SysCtlPeripheralReady(SYSCTL_PERIPH_UART0)) {}
-    while(!SysCtlPeripheralReady(SYSCTL_PERIPH_GPIOA)) {}
-    while(!SysCtlPeripheralReady(SYSCTL_PERIPH_TIMER0)) {}
+    while (!SysCtlPeripheralReady(SYSCTL_PERIPH_GPIOC)) {}
+    while (!SysCtlPeripheralReady(SYSCTL_PERIPH_UART0)) {}
+    while (!SysCtlPeripheralReady(SYSCTL_PERIPH_GPIOA)) {}
+    while (!SysCtlPeripheralReady(SYSCTL_PERIPH_TIMER0)) {}
 
-    // Configure UART0 pins
+    // Configure UART0 pins (PA0 = RX, PA1 = TX)
     GPIOPinConfigure(GPIO_PA0_U0RX);
     GPIOPinConfigure(GPIO_PA1_U0TX);
     GPIOPinTypeUART(GPIO_PORTA_BASE, GPIO_PIN_0 | GPIO_PIN_1);
-    UARTConfigSetExpClk(UART0_BASE, SysCtlClockGet(), 115200, (UART_CONFIG_WLEN_8 | UART_CONFIG_STOP_ONE | UART_CONFIG_PAR_NONE));
+    UARTConfigSetExpClk(UART0_BASE, SysCtlClockGet(), 115200,
+        (UART_CONFIG_WLEN_8 | UART_CONFIG_STOP_ONE | UART_CONFIG_PAR_NONE));
 
-    // Configure PC4 as input
+    // Configure PC4 as digital input
     GPIOPinTypeGPIOInput(GPIO_PORTC_BASE, GPIO_PIN_4);
 
-    // Set up interrupt on rising edge for PC4
-    GPIOIntDisable(GPIO_PORTC_BASE, GPIO_PIN_4);
-    GPIOIntClear(GPIO_PORTC_BASE, GPIO_PIN_4);
-    GPIOIntTypeSet(GPIO_PORTC_BASE, GPIO_PIN_4, GPIO_RISING_EDGE);
-    GPIOIntRegister(GPIO_PORTC_BASE, GPIOCIntHandler);
-    GPIOIntEnable(GPIO_PORTC_BASE, GPIO_PIN_4);
+    // Set up interrupt on rising edge for PC4 (external clock input)
+    GPIOIntDisable(GPIO_PORTC_BASE, GPIO_PIN_4); // Disable during config
+    GPIOIntClear(GPIO_PORTC_BASE, GPIO_PIN_4);   // Clear any prior interrupt
+    GPIOIntTypeSet(GPIO_PORTC_BASE, GPIO_PIN_4, GPIO_RISING_EDGE); // Rising edge
+    GPIOIntRegister(GPIO_PORTC_BASE, GPIOCIntHandler); // Register ISR
+    GPIOIntEnable(GPIO_PORTC_BASE, GPIO_PIN_4);  // Enable interrupt
 
     // Configure Timer0A for 1us periodic interrupts
-    TimerConfigure(TIMER0_BASE, TIMER_CFG_PERIODIC);
-    // 50 MHz clock, so 1us = 50 cycles
-    TimerLoadSet(TIMER0_BASE, TIMER_A, 50 - 1);
-    TimerIntRegister(TIMER0_BASE, TIMER_A, Timer0AIntHandler);
-    TimerIntEnable(TIMER0_BASE, TIMER_TIMA_TIMEOUT);
-    TimerEnable(TIMER0_BASE, TIMER_A);
+    TimerConfigure(TIMER0_BASE, TIMER_CFG_PERIODIC); // Periodic mode
+    TimerLoadSet(TIMER0_BASE, TIMER_A, 50 - 1);      // 50 MHz clock: 50 cycles = 1us
+    TimerIntRegister(TIMER0_BASE, TIMER_A, Timer0AIntHandler); // Register ISR
+    TimerIntEnable(TIMER0_BASE, TIMER_TIMA_TIMEOUT); // Enable timeout interrupt
+    TimerEnable(TIMER0_BASE, TIMER_A);               // Start timer
 
-    // Enable processor interrupts
+    // Enable global interrupts
     IntMasterEnable();
 
-    // Loop forever, all work done in interrupts
-    while(1) {
-        // Optionally, enter sleep mode to save power
+    // Main loop: all work is interrupt-driven
+    while (1) {
+        // Optionally, enter sleep mode to save power between interrupts
         // SysCtlSleep();
     }
 }
