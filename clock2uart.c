@@ -53,6 +53,10 @@ void __error__(char *pcFilename, uint32_t ui32Line) {
 //*****************************************************************************
 /**
  * @brief Counts the number of triggers (rising edges) received on PC4.
+ *
+ * This variable is incremented in the GPIOC interrupt handler each time a
+ * rising edge is detected on the PC4 pin. It is used to track the total
+ * number of clock pulses received.
  */
 volatile uint32_t g_TriggerCount = 0;
 
@@ -60,19 +64,19 @@ volatile uint32_t g_TriggerCount = 0;
  * @brief Microsecond counter incremented by Timer0A interrupt.
  *
  * This variable holds the number of microseconds since the timer started.
- * It is incremented every 1us by the Timer0A interrupt handler.
+ * It is incremented every 1us by the Timer0A interrupt handler and is used
+ * to provide precise timing information for UART and LCD outputs.
  */
 volatile uint64_t us_counter = 0;
 
 /**
  * @brief Delay factor for LCD nibble timing.
  *
- * This global variable controls the delay used after sending each nibble to the LCD.
- * It is used as a divisor for SysCtlDelay(SysCtlClockGet() / g_LCDNibbleDelayFactor).
- * Increase this value for shorter delays, decrease for longer delays.
- * Typical values: 90000 (short), 30000 (medium), 500 (long, ~2ms at 50MHz).
+ * This global variable controls the delay used after sending each nibble to
+ * the LCD. It is used as a divisor for SysCtlDelay(SysCtlClockGet() / g_LCDNibbleDelayFactor).
+ * Adjust this value to fine-tune the timing for your specific LCD module.
  */
-volatile uint32_t g_LCDNibbleDelayFactor = 5000;
+volatile uint32_t g_LCDNibbleDelayFactor = 90000;
 
 //*****************************************************************************
 // LCD Definitions
@@ -154,6 +158,10 @@ void I2C0IntHandler(void)
 /**
  * @brief Writes a byte to the I2C bus for the LCD.
  * @param byte The byte to send over I2C.
+ *
+ * This function handles the low-level I2C communication with the PCF8574
+ * controller on the LCD module. It ensures the I2C bus is not busy before
+ * sending data and waits for the transfer to complete.
  */
 void I2C_Write_Byte(uint8_t byte) {
     // Wait until I2C bus is not busy
@@ -171,9 +179,10 @@ void I2C_Write_Byte(uint8_t byte) {
 /**
  * @brief Sends a nibble (4 bits) to the LCD, with enable pulse.
  * @param nibble The 4-bit data to send (upper or lower nibble of the LCD command/data).
- * This 'nibble' parameter should already be in the upper 4 bits
- * (e.g., for 0x30, pass 0x30; for 0x20, pass 0x20).
  * @param mode   Control mode (0 for command, 1 for data).
+ *
+ * This function prepares the control and data bits for the PCF8574 and
+ * generates the enable pulse to latch the data into the LCD.
  */
 void LCD_SendNibble(uint8_t nibble, uint8_t mode) {
     uint8_t pcf_byte = 0;
@@ -200,8 +209,11 @@ void LCD_SendNibble(uint8_t nibble, uint8_t mode) {
 
 /**
  * @brief Sends a full byte command to the LCD.
- * @param command The 8-bit command to send.
- * IMPORTANT: Sends UPPER nibble first, then LOWER nibble.
+ * @param command The 8-bit command to send to the LCD.
+ *
+ * This function splits the command into two nibbles and sends them sequentially
+ * using the `LCD_SendNibble` function. It is used for both initialization and
+ * regular command operations.
  */
 void LCD_SendCommand(uint8_t command) {
     // Send UPPER nibble first (RS=0 for command)
@@ -260,11 +272,32 @@ void LCD_PrintString(char* str) {
 }
 
 /**
+ * @brief Updates the LCD with the current timestamp and trigger count.
+ *
+ * This function formats the microsecond counter and trigger count as strings
+ * and displays them on the LCD. It is called periodically or after each event.
+ */
+void LCD_UpdateDisplay(void) {
+    // Example implementation:
+    char line1[21], line2[21];
+    snprintf(line1, sizeof(line1), "Time: %llu us", us_counter);
+    snprintf(line2, sizeof(line2), "Triggers: %lu", g_TriggerCount);
+    LCD_SetCursor(0, 0);
+    LCD_PrintString(line1);
+    LCD_SetCursor(1, 0);
+    LCD_PrintString(line2);
+}
+
+//*****************************************************************************
+// Interrupt Handlers
+//*****************************************************************************
+
+/**
  * @brief GPIO Port C interrupt handler for PC4 (clock input).
  *
  * This ISR is triggered on a rising edge at PC4. It clears the interrupt flag,
- * prints the current microsecond counter value over UART0, and sends CR+LF.
- * It also displays the timestamp on the LCD.
+ * prints the current microsecond counter value over UART0, and updates the LCD
+ * with the timestamp and trigger count.
  */
 void GPIOCIntHandler(void) {
     // Increment trigger count
