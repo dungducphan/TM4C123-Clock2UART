@@ -304,18 +304,10 @@ void GPIOCIntHandler(void) {
 
     // Set cursor to the first line, first column
     LCD_SendCommand(0x80);
-    LCD_PrintString("Timestamp:");
+    LCD_PrintString(timestamp_str);
 
     // Set cursor to the second line, first column
     LCD_SendCommand(0xC0);
-    LCD_PrintString(timestamp_str);
-
-    // Set cursor to the third line, first column
-    LCD_SendCommand(0x94); // 0x94 = 3rd line, 1st col for 20x4 LCD
-    LCD_PrintString("Triggers:");
-
-    // Set cursor to the fourth line, first column
-    LCD_SendCommand(0xD4); // 0xD4 = 4th line, 1st col for 20x4 LCD
     LCD_PrintString(trigger_str);
 }
 
