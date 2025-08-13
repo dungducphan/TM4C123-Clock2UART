@@ -11,5 +11,5 @@
 	<createSlaveProjects value=""/>
 	<filesToOpen value=""/>
 	<origin value="C:/ti/TivaWare_C_Series-2.2.0.295/examples/boards/ek-tm4c123gxl/project0/ccs"/>
-	<isTargetManual value="false"/>
+	<isTargetManual value="true"/>
 </projectOptions>
