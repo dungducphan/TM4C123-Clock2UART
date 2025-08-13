@@ -109,20 +109,17 @@ void Timer0AIntHandler(void) {
  * character by character over UART0. No leading zeros are printed.
  */
 void UARTPrintUint64(uint64_t value) {
-    char buf[21]; // Buffer to hold digits (max for 64-bit int)
-    int i = 0;
-    if (value == 0) {
-        UARTCharPut(UART0_BASE, '0');
-        return;
+    char buf[16]; // 15 digits + null terminator
+    int i = 15;
+    buf[i] = '\0';
+    i--;
+    uint64_t temp = value;
+    for (; i >= 0; i--) {
+        buf[i] = '0' + (temp % 10);
+        temp /= 10;
     }
-    // Extract digits in reverse order
-    while (value > 0 && i < 20) {
-        buf[i++] = '0' + (value % 10);
-        value /= 10;
-    }
-    // Print digits in correct order
-    while (i > 0) {
-        UARTCharPut(UART0_BASE, buf[--i]);
+    for (i = 0; i < 15; i++) {
+        UARTCharPut(UART0_BASE, buf[i]);
     }
 }
 
@@ -270,30 +267,14 @@ void GPIOCIntHandler(void) {
     UARTCharPut(UART0_BASE, '\n');            // Line feed
 
     // --- LCD Output (new functionality) ---
-    char timestamp_str[21]; // Max size for a 64-bit number (20 digits + null terminator)
-    memset(timestamp_str, 0, sizeof(timestamp_str)); // Clear buffer
+    char timestamp_str[16]; // 15 digits + null terminator
+    int i = 15;
+    timestamp_str[i] = '\0';
+    i--;
     uint64_t temp_counter = us_counter;
-    int i = 0;
-
-    if (temp_counter == 0) {
-        timestamp_str[i++] = '0';
-    } else {
-        // Convert to string in reverse order
-        while (temp_counter > 0 && i < 20) {
-            timestamp_str[i++] = '0' + (temp_counter % 10);
-            temp_counter /= 10;
-        }
-    }
-    timestamp_str[i] = '\0'; // Null-terminate the string
-
-    // Reverse the string
-    int j = 0;
-    char temp_char;
-    while (j < i / 2) {
-        temp_char = timestamp_str[j];
-        timestamp_str[j] = timestamp_str[i - 1 - j];
-        timestamp_str[i - 1 - j] = temp_char;
-        j++;
+    for (; i >= 0; i--) {
+        timestamp_str[i] = '0' + (temp_counter % 10);
+        temp_counter /= 10;
     }
 
     LCD_SendCommand(0x01); // Clear display
