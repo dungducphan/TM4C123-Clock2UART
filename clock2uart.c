@@ -76,7 +76,7 @@ volatile uint64_t us_counter = 0;
  * the LCD. It is used as a divisor for SysCtlDelay(SysCtlClockGet() / g_LCDNibbleDelayFactor).
  * Adjust this value to fine-tune the timing for your specific LCD module.
  */
-volatile uint32_t g_LCDNibbleDelayFactor = 90000;
+volatile uint32_t g_LCDNibbleDelayFactor = 30000;
 
 //*****************************************************************************
 // LCD Definitions
@@ -245,14 +245,14 @@ void LCD_Init() {
     // Send reset commands in 8-bit mode (first 3 times)
     // Note: These are sent as 4-bit "nibbles" but act as 8-bit commands for init
     LCD_SendNibble(0x30, 0x00); // Function Set (8-bit interface)
-    SysCtlDelay(SysCtlClockGet() / 30000); // Longer delay after each nibble
+    SysCtlDelay(SysCtlClockGet() / g_LCDNibbleDelayFactor); // Longer delay after each nibble
     LCD_SendNibble(0x30, 0x00); // Function Set (8-bit interface)
-    SysCtlDelay(SysCtlClockGet() / 30000);
+    SysCtlDelay(SysCtlClockGet() / g_LCDNibbleDelayFactor);
     LCD_SendNibble(0x30, 0x00); // Function Set (8-bit interface)
-    SysCtlDelay(SysCtlClockGet() / 30000);
+    SysCtlDelay(SysCtlClockGet() / g_LCDNibbleDelayFactor);
 
     LCD_SendNibble(0x20, 0x00); // Set to 4-bit interface
-    SysCtlDelay(SysCtlClockGet() / 30000);
+    SysCtlDelay(SysCtlClockGet() / g_LCDNibbleDelayFactor);
 
     LCD_SendCommand(0x28); // Function Set: 4-bit, 2 lines, 5x8 dots
     LCD_SendCommand(0x0C); // Display ON, Cursor OFF, Blink OFF
