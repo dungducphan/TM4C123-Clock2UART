@@ -113,17 +113,21 @@ void Timer0AIntHandler(void) {
  * character by character over UART0. No leading zeros are printed.
  */
 void UARTPrintUint64(uint64_t value) {
-    char buf[16]; // 15 digits + null terminator
-    int i = 15;
-    buf[i] = '\0';
-    i--;
-    uint64_t temp = value;
-    for (; i >= 0; i--) {
-        buf[i] = '0' + (temp % 10);
-        temp /= 10;
+    // Print without leading zeros
+    char buf[21]; // up to 20 digits for uint64 + null
+    int i = 0;
+    if (value == 0) {
+        UARTCharPut(UART0_BASE, '0');
+        return;
     }
-    for (i = 0; i < 15; i++) {
-        UARTCharPut(UART0_BASE, buf[i]);
+    // collect digits in reverse order
+    while (value > 0 && i < 20) {
+        buf[i++] = (char)('0' + (value % 10));
+        value /= 10;
+    }
+    // output in correct order
+    while (i > 0) {
+        UARTCharPut(UART0_BASE, buf[--i]);
     }
 }
 
@@ -273,26 +277,42 @@ void GPIOCIntHandler(void) {
     UARTCharPut(UART0_BASE, '\n');            // Line feed
 
     // --- LCD Output (new functionality) ---
-    char timestamp_str[16]; // 15 digits + null terminator
-    int i = 15;
-    timestamp_str[i] = '\0';
-    i--;
-    uint64_t temp_counter = us_counter;
-    for (; i >= 0; i--) {
-        timestamp_str[i] = '0' + (temp_counter % 10);
-        temp_counter /= 10;
+    // Build human-readable strings (no leading zeros)
+    char timestamp_str[21]; // up to 20 digits + null
+    char trigger_str[21];   // up to 20 digits + null
+
+    // Timestamp string
+    {
+        uint64_t v = us_counter;
+        if (v == 0) {
+            timestamp_str[0] = '0';
+            timestamp_str[1] = '\0';
+        } else {
+            char rev[21];
+            int n = 0;
+            while (v > 0 && n < 20) { rev[n++] = (char)('0' + (v % 10)); v /= 10; }
+            // reverse into output
+            int j = 0;
+            for (; j < n; ++j) timestamp_str[j] = rev[n - 1 - j];
+            timestamp_str[j] = '\0';
+        }
     }
 
-    // Prepare trigger count string
-        char trigger_str[16]; // 15 digits + null terminator
-        int trig_i = 15;
-        trigger_str[trig_i] = '\0';
-        trig_i--;
-        uint64_t temp_trig = g_TriggerCount;
-        for (; trig_i >= 0; trig_i--) {
-            trigger_str[trig_i] = '0' + (temp_trig % 10);
-            temp_trig /= 10;
+    // Trigger count string
+    {
+        uint64_t v = (uint64_t)g_TriggerCount;
+        if (v == 0) {
+            trigger_str[0] = '0';
+            trigger_str[1] = '\0';
+        } else {
+            char rev[21];
+            int n = 0;
+            while (v > 0 && n < 20) { rev[n++] = (char)('0' + (v % 10)); v /= 10; }
+            int j = 0;
+            for (; j < n; ++j) trigger_str[j] = rev[n - 1 - j];
+            trigger_str[j] = '\0';
         }
+    }
 
     LCD_SendCommand(0x01); // Clear display
     // IMPORTANT: Longer delay required for clear display command to complete (~2ms)
