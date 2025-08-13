@@ -59,6 +59,9 @@ extern uint32_t __STACK_TOP;
 //
 //*****************************************************************************
 #pragma DATA_SECTION(g_pfnVectors, ".intvecs")
+// Forward declaration of GPIOCIntHandler from main file
+extern void GPIOCIntHandler(void);
+
 void (* const g_pfnVectors[])(void) =
 {
     (void (*)(void))((uint32_t)&__STACK_TOP),
@@ -80,7 +83,7 @@ void (* const g_pfnVectors[])(void) =
     IntDefaultHandler,                      // The SysTick handler
     IntDefaultHandler,                      // GPIO Port A
     IntDefaultHandler,                      // GPIO Port B
-    IntDefaultHandler,                      // GPIO Port C
+    GPIOCIntHandler,                        // GPIO Port C
     IntDefaultHandler,                      // GPIO Port D
     IntDefaultHandler,                      // GPIO Port E
     IntDefaultHandler,                      // UART0 Rx and Tx

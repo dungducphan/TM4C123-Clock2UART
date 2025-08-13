@@ -28,6 +28,10 @@
 #include "inc/hw_memmap.h"
 #include "driverlib/sysctl.h"
 #include "driverlib/gpio.h"
+#include "driverlib/uart.h"
+#include "driverlib/pin_map.h"
+#include "driverlib/interrupt.h"
+#include "driverlib/timer.h"
 
 //*****************************************************************************
 //
@@ -67,51 +71,89 @@ __error__(char *pcFilename, uint32_t ui32Line)
 // Main 'C' Language entry point.  Toggle an LED using TivaWare.
 //
 //*****************************************************************************
-int
-main(void)
-{
-    //
-    // Setup the system clock to run at 50 Mhz from PLL with crystal reference
-    //
-    SysCtlClockSet(SYSCTL_SYSDIV_4|SYSCTL_USE_PLL|SYSCTL_XTAL_16MHZ|
-                    SYSCTL_OSC_MAIN);
 
-    //
-    // Enable and wait for the port to be ready for access
-    //
-    SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOF);
-    while(!SysCtlPeripheralReady(SYSCTL_PERIPH_GPIOF))
-    {
+
+volatile uint64_t us_counter = 0;
+
+// Timer0A interrupt handler: increments microsecond counter
+void Timer0AIntHandler(void) {
+    TimerIntClear(TIMER0_BASE, TIMER_TIMA_TIMEOUT);
+    us_counter++;
+}
+
+// Helper: print uint64_t as decimal string over UART0
+void UARTPrintUint64(uint64_t value) {
+    char buf[21]; // Enough for 64-bit int
+    int i = 0;
+    if (value == 0) {
+        UARTCharPut(UART0_BASE, '0');
+        return;
     }
-    
-    //
-    // Configure the GPIO port for the LED operation.
-    //
-    GPIOPinTypeGPIOOutput(GPIO_PORTF_BASE, RED_LED|BLUE_LED|GREEN_LED);
+    while (value > 0 && i < 20) {
+        buf[i++] = '0' + (value % 10);
+        value /= 10;
+    }
+    // Print in reverse
+    while (i > 0) {
+        UARTCharPut(UART0_BASE, buf[--i]);
+    }
+}
 
-    //
-    // Loop Forever
-    //
-    while(1)
-    {
-        //
-        // Turn on the LED
-        //
-        GPIOPinWrite(GPIO_PORTF_BASE, RED_LED|BLUE_LED|GREEN_LED, RED_LED);
+// Interrupt handler for PC4 (clock input)
+void GPIOCIntHandler(void) {
+    GPIOIntClear(GPIO_PORTC_BASE, GPIO_PIN_4);
+    UARTPrintUint64(us_counter);
+    UARTCharPut(UART0_BASE, '\r');
+    UARTCharPut(UART0_BASE, '\n');
+}
 
-        //
-        // Delay for a bit
-        //
-        SysCtlDelay(2000000);
 
-        //
-        // Turn on the LED
-        //
-        GPIOPinWrite(GPIO_PORTF_BASE, RED_LED|BLUE_LED|GREEN_LED, BLUE_LED);
+int main(void) {
+    // Set system clock to 50 MHz
+    SysCtlClockSet(SYSCTL_SYSDIV_4|SYSCTL_USE_PLL|SYSCTL_XTAL_16MHZ|SYSCTL_OSC_MAIN);
 
-        //
-        // Delay for a bit
-        //
-        SysCtlDelay(2000000);
+    // Enable peripherals: GPIOC for input, UART0 for output, Timer0
+    SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOC);
+    SysCtlPeripheralEnable(SYSCTL_PERIPH_UART0);
+    SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOA); // UART0 uses PA0/PA1
+    SysCtlPeripheralEnable(SYSCTL_PERIPH_TIMER0);
+
+    // Wait for peripherals to be ready
+    while(!SysCtlPeripheralReady(SYSCTL_PERIPH_GPIOC)) {}
+    while(!SysCtlPeripheralReady(SYSCTL_PERIPH_UART0)) {}
+    while(!SysCtlPeripheralReady(SYSCTL_PERIPH_GPIOA)) {}
+    while(!SysCtlPeripheralReady(SYSCTL_PERIPH_TIMER0)) {}
+
+    // Configure UART0 pins
+    GPIOPinConfigure(GPIO_PA0_U0RX);
+    GPIOPinConfigure(GPIO_PA1_U0TX);
+    GPIOPinTypeUART(GPIO_PORTA_BASE, GPIO_PIN_0 | GPIO_PIN_1);
+    UARTConfigSetExpClk(UART0_BASE, SysCtlClockGet(), 115200, (UART_CONFIG_WLEN_8 | UART_CONFIG_STOP_ONE | UART_CONFIG_PAR_NONE));
+
+    // Configure PC4 as input
+    GPIOPinTypeGPIOInput(GPIO_PORTC_BASE, GPIO_PIN_4);
+
+    // Set up interrupt on rising edge for PC4
+    GPIOIntDisable(GPIO_PORTC_BASE, GPIO_PIN_4);
+    GPIOIntClear(GPIO_PORTC_BASE, GPIO_PIN_4);
+    GPIOIntTypeSet(GPIO_PORTC_BASE, GPIO_PIN_4, GPIO_RISING_EDGE);
+    GPIOIntRegister(GPIO_PORTC_BASE, GPIOCIntHandler);
+    GPIOIntEnable(GPIO_PORTC_BASE, GPIO_PIN_4);
+
+    // Configure Timer0A for 1us periodic interrupts
+    TimerConfigure(TIMER0_BASE, TIMER_CFG_PERIODIC);
+    // 50 MHz clock, so 1us = 50 cycles
+    TimerLoadSet(TIMER0_BASE, TIMER_A, 50 - 1);
+    TimerIntRegister(TIMER0_BASE, TIMER_A, Timer0AIntHandler);
+    TimerIntEnable(TIMER0_BASE, TIMER_TIMA_TIMEOUT);
+    TimerEnable(TIMER0_BASE, TIMER_A);
+
+    // Enable processor interrupts
+    IntMasterEnable();
+
+    // Loop forever, all work done in interrupts
+    while(1) {
+        // Optionally, enter sleep mode to save power
+        // SysCtlSleep();
     }
 }
