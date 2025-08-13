@@ -26,6 +26,21 @@
 #include "inc/hw_nvic.h"
 #include "inc/hw_types.h"
 
+// Define I2C_MICR_IC if not defined
+#ifndef I2C_MICR_IC
+#define I2C_MICR_IC 0x1
+#endif
+
+// Define I2C_O_MICR if not defined (offset for I2C Master Interrupt Clear Register)
+#ifndef I2C_O_MICR
+#define I2C_O_MICR 0x1C
+#endif
+
+// Define I2C0_BASE if not defined (base address for I2C0 peripheral)
+#ifndef I2C0_BASE
+#define I2C0_BASE 0x40020000
+#endif
+
 //*****************************************************************************
 //
 // Forward declaration of the default fault handlers.
@@ -61,6 +76,8 @@ extern uint32_t __STACK_TOP;
 #pragma DATA_SECTION(g_pfnVectors, ".intvecs")
 // Forward declaration of GPIOCIntHandler from main file
 extern void GPIOCIntHandler(void);
+// New: Forward declaration for I2C0IntHandler
+extern void I2C0IntHandler(void);
 
 void (* const g_pfnVectors[])(void) =
 {
@@ -89,7 +106,7 @@ void (* const g_pfnVectors[])(void) =
     IntDefaultHandler,                      // UART0 Rx and Tx
     IntDefaultHandler,                      // UART1 Rx and Tx
     IntDefaultHandler,                      // SSI0 Rx and Tx
-    IntDefaultHandler,                      // I2C0 Master and Slave
+    I2C0IntHandler,                         // I2C0 Master and Slave (Updated to I2C0IntHandler)
     IntDefaultHandler,                      // PWM Fault
     IntDefaultHandler,                      // PWM Generator 0
     IntDefaultHandler,                      // PWM Generator 1
