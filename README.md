@@ -20,7 +20,7 @@ Welcome to **Clock2UART**! This project transforms your TM4C123 microcontroller 
 ## 🛠️ Hardware Requirements
 
 - 🧑‍💻 TI TM4C123 microcontroller (e.g., EK-TM4C123GXL LaunchPad)
-- ⏲️ External clock or signal source (0.1 Hz to 1 kHz) connected to PC4
+- ⏲️ External clock or signal source (0.01 Hz to 10Hz) connected to PC4
 - 🔌 UART-to-USB adapter or onboard debugger for serial output
 - 💡 Optional: 2004A LCD module with PCF8574 I2C backpack for real-time display
 
