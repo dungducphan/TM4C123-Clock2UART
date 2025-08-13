@@ -284,21 +284,15 @@ void GPIOCIntHandler(void) {
     }
 
     // Prepare trigger count string
-    char trigger_str[12];
-    int trig_i = 11;
-    trigger_str[trig_i] = '\0';
-    trig_i--;
-    uint32_t temp_trig = g_TriggerCount;
-    for (; trig_i >= 0; trig_i--) {
-        trigger_str[trig_i] = '0' + (temp_trig % 10);
-        temp_trig /= 10;
-        if (temp_trig == 0 && trig_i > 0) {
-            // Pad with spaces for alignment
-            int k;
-            for (k = trig_i - 1; k >= 0; k--) trigger_str[k] = ' ';
-            break;
+        char trigger_str[16]; // 15 digits + null terminator
+        int trig_i = 15;
+        trigger_str[trig_i] = '\0';
+        trig_i--;
+        uint64_t temp_trig = g_TriggerCount;
+        for (; trig_i >= 0; trig_i--) {
+            trigger_str[trig_i] = '0' + (temp_trig % 10);
+            temp_trig /= 10;
         }
-    }
 
     LCD_SendCommand(0x01); // Clear display
     // IMPORTANT: Longer delay required for clear display command to complete (~2ms)
