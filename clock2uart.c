@@ -306,6 +306,8 @@ void GPIOCIntHandler(void) {
 
     // --- UART Output (existing functionality) ---
     UARTPrintUint64(us_counter);               // Print timestamp
+    UARTCharPut(UART0_BASE, ' ');              // Space separator
+    UARTPrintUint64(g_TriggerCount);           // Print trigger count
     UARTCharPut(UART0_BASE, '\r');            // Carriage return
     UARTCharPut(UART0_BASE, '\n');            // Line feed
 
