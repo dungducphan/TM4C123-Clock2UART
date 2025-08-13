@@ -109,6 +109,30 @@ void Timer0AIntHandler(void) {
 }
 
 /**
+ * @brief UART0 interrupt handler for received characters.
+ *
+ * This ISR is triggered when a character is received on UART0.
+ * It resets the trigger counter to 0.
+ */
+void UART0IntHandler(void) {
+    uint32_t ui32Status;
+    
+    // Get and clear the interrupt status
+    ui32Status = UARTIntStatus(UART0_BASE, true);
+    UARTIntClear(UART0_BASE, ui32Status);
+    
+    // Check if this is a receive interrupt
+    if(ui32Status & UART_INT_RX) {
+        // Read and discard all available characters
+        while(UARTCharsAvail(UART0_BASE)) {
+            (void)UARTCharGet(UART0_BASE);
+        }
+        // Reset trigger counter
+        g_TriggerCount = 0;
+    }
+}
+
+/**
  * @brief Print a 64-bit unsigned integer as a decimal string over UART0.
  *
  * @param value The 64-bit unsigned integer to print.
@@ -407,6 +431,11 @@ int main(void) {
     GPIOPinTypeUART(GPIO_PORTA_BASE, GPIO_PIN_0 | GPIO_PIN_1);
     UARTConfigSetExpClk(UART0_BASE, SysCtlClockGet(), 115200,
         (UART_CONFIG_WLEN_8 | UART_CONFIG_STOP_ONE | UART_CONFIG_PAR_NONE));
+    
+    // Configure UART0 interrupts
+    UARTIntRegister(UART0_BASE, UART0IntHandler);
+    UARTIntEnable(UART0_BASE, UART_INT_RX);
+    UARTEnable(UART0_BASE);
 
     // Configure I2C0 pins (PB2 = SCL, PB3 = SDA)
     GPIOPinConfigure(GPIO_PB2_I2C0SCL);
@@ -448,15 +477,6 @@ int main(void) {
 
     // Main loop: all work is interrupt-driven
     while (1) {
-        // Poll UART0 for received characters
-        if (UARTCharsAvail(UART0_BASE)) {
-            char c = UARTCharGet(UART0_BASE);
-            if (c == 'R' || c == 'r') {
-                // Software reset using NVIC APINT register (TivaWare)
-                HWREG(0xE000ED0C) = 0x05FA0004;
-                while (1); // Wait for reset
-            }
-        }
         // Optionally, enter sleep mode to save power between interrupts
         // SysCtlSleep();
     }

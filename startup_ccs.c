@@ -78,6 +78,8 @@ extern uint32_t __STACK_TOP;
 extern void GPIOCIntHandler(void);
 // New: Forward declaration for I2C0IntHandler
 extern void I2C0IntHandler(void);
+// New: Forward declaration for UART0IntHandler
+extern void UART0IntHandler(void);
 
 void (* const g_pfnVectors[])(void) =
 {
@@ -103,7 +105,7 @@ void (* const g_pfnVectors[])(void) =
     GPIOCIntHandler,                        // GPIO Port C
     IntDefaultHandler,                      // GPIO Port D
     IntDefaultHandler,                      // GPIO Port E
-    IntDefaultHandler,                      // UART0 Rx and Tx
+    UART0IntHandler,                        // UART0 Rx and Tx
     IntDefaultHandler,                      // UART1 Rx and Tx
     IntDefaultHandler,                      // SSI0 Rx and Tx
     I2C0IntHandler,                         // I2C0 Master and Slave (Updated to I2C0IntHandler)
