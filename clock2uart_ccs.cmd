@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * project0_ccs.cmd - CCS linker configuration file for project0.
+ * clock2uart_ccs.cmd - CCS linker configuration file for clock2uart.
  *
  * Copyright (c) 2012-2020 Texas Instruments Incorporated.  All rights reserved.
  * Software License Agreement
