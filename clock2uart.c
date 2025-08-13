@@ -22,7 +22,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-#include <string.h> // For strlen, memset
+#include <string.h>
 #include "inc/hw_types.h"
 #include "inc/hw_memmap.h"
 #include "driverlib/sysctl.h"
@@ -31,8 +31,8 @@
 #include "driverlib/pin_map.h"
 #include "driverlib/interrupt.h"
 #include "driverlib/timer.h"
-#include "driverlib/i2c.h" // New include for I2C
-#include "inc/hw_i2c.h"    // New include for I2C hardware registers
+#include "driverlib/i2c.h"
+#include "inc/hw_i2c.h"
 
 //*****************************************************************************
 // Error routine called by driver library if an error is encountered (debug)
@@ -60,19 +60,30 @@ void __error__(char *pcFilename, uint32_t ui32Line) {
  */
 volatile uint64_t us_counter = 0;
 
+/**
+ * @brief Delay factor for LCD nibble timing.
+ *
+ * This global variable controls the delay used after sending each nibble to the LCD.
+ * It is used as a divisor for SysCtlDelay(SysCtlClockGet() / g_LCDNibbleDelayFactor).
+ * Increase this value for shorter delays, decrease for longer delays.
+ * Typical values: 90000 (short), 30000 (medium), 500 (long, ~2ms at 50MHz).
+ */
+volatile uint32_t g_LCDNibbleDelayFactor = 5000;
+
 //*****************************************************************************
 // LCD Definitions
 //*****************************************************************************
 
 // Define I2C address for the LCD module (commonly 0x27 or 0x3F)
 #define LCD_I2C_ADDR 0x27
-// PCF8574 control bits for the LCD.
-// P7 P6 P5 P4 P3 P2 P1 P0
-// D7 D6 D5 D4 BL EN RW RS
-// BL = Backlight (Bit 3), EN = Enable (Bit 2), RW = Read/Write (Bit 1), RS = Register Select (Bit 0)
-// For sending commands, RS=0. For sending data, RS=1.
-// Backlight on, RW=0 (write mode)
-#define PCF8574_PORT_OUT 0x08 // Backlight ON (Bit 3 set)
+
+// PCF8574 control bits for the LCD (Most common backpack mapping, P0-P3 control, P4-P7 data):
+// PCF8574 Pins:   P7 P6 P5 P4 P3 P2 P1 P0
+// LCD Connections:D7 D6 D5 D4 BL EN RW RS
+#define PCF8574_RS  0x01    // P0 of PCF8574 connected to LCD RS
+#define PCF8574_RW  0x02    // P1 of PCF8574 connected to LCD RW
+#define PCF8574_EN  0x04    // P2 of PCF8574 connected to LCD EN
+#define PCF8574_BL  0x08    // P3 of PCF8574 connected to LCD Backlight
 
 //*****************************************************************************
 // Interrupt Service Routines (ISRs)
@@ -117,7 +128,7 @@ void UARTPrintUint64(uint64_t value) {
 
 
 //*****************************************************************************
-// New: I2C0 Interrupt Handler
+// New: I2C0 Interrupt Handler (defined in startup_ccs.c)
 //*****************************************************************************
 void I2C0IntHandler(void)
 {
@@ -154,66 +165,83 @@ void I2C_Write_Byte(uint8_t byte) {
 
 /**
  * @brief Sends a nibble (4 bits) to the LCD, with enable pulse.
- * @param nibble The 4-bit data to send (upper or lower nibble).
+ * @param nibble The 4-bit data to send (upper or lower nibble of the LCD command/data).
+ * This 'nibble' parameter should already be in the upper 4 bits
+ * (e.g., for 0x30, pass 0x30; for 0x20, pass 0x20).
  * @param mode   Control mode (0 for command, 1 for data).
  */
 void LCD_SendNibble(uint8_t nibble, uint8_t mode) {
-    // Combine nibble with backlight, R/W (write), and RS (command/data) bits
-    uint8_t data = nibble | PCF8574_PORT_OUT | mode;
+    uint8_t pcf_byte = 0;
 
-    // Pulse Enable (EN) high then low to latch data
-    I2C_Write_Byte(data | 0x04); // EN high
-    SysCtlDelay(SysCtlClockGet() / 90000); // Small delay for E pulse width
-    I2C_Write_Byte(data & ~0x04); // EN low
-    SysCtlDelay(SysCtlClockGet() / 90000); // Small delay for E pulse width
+    // The 'nibble' parameter already contains the 4 data bits (D7-D4) shifted to their
+    // correct positions (bits 7-4). These directly map to PCF8574 pins P7-P4.
+    pcf_byte = (nibble & 0xF0);
+
+    // Set control bits (RS, RW, Backlight)
+    if (mode == 0) { // Command mode (RS = 0)
+        pcf_byte &= ~PCF8574_RS; // Ensure RS is low
+    } else {         // Data mode (RS = 1)
+        pcf_byte |= PCF8574_RS;  // Ensure RS is high
+    }
+    pcf_byte &= ~PCF8574_RW; // Ensure RW is low (write mode)
+    pcf_byte |= PCF8574_BL; // Ensure Backlight is ON
+
+    // Pulse Enable (EN) to latch the data
+    I2C_Write_Byte(pcf_byte | PCF8574_EN); // EN high
+    SysCtlDelay(SysCtlClockGet() / g_LCDNibbleDelayFactor); // Small delay for E pulse width
+    I2C_Write_Byte(pcf_byte & ~PCF8574_EN); // EN low
+    SysCtlDelay(SysCtlClockGet() / g_LCDNibbleDelayFactor); // Small delay for E pulse width
 }
 
 /**
  * @brief Sends a full byte command to the LCD.
  * @param command The 8-bit command to send.
+ * IMPORTANT: Sends UPPER nibble first, then LOWER nibble.
  */
 void LCD_SendCommand(uint8_t command) {
-    // Send upper nibble (RS=0 for command)
+    // Send UPPER nibble first (RS=0 for command)
     LCD_SendNibble(command & 0xF0, 0x00);
-    // Send lower nibble (RS=0 for command)
+    // Send LOWER nibble second (RS=0 for command)
     LCD_SendNibble((command << 4) & 0xF0, 0x00);
-    SysCtlDelay(SysCtlClockGet() / 90000); // Wait after command
+    SysCtlDelay(SysCtlClockGet() / g_LCDNibbleDelayFactor); // Wait after command
 }
 
 /**
  * @brief Sends a full byte of data to the LCD.
  * @param data The 8-bit data (character) to send.
+ * IMPORTANT: Sends UPPER nibble first, then LOWER nibble.
  */
 void LCD_SendData(uint8_t data) {
-    // Send upper nibble (RS=1 for data)
+    // Send UPPER nibble first (RS=1 for data)
     LCD_SendNibble(data & 0xF0, 0x01);
-    // Send lower nibble (RS=1 for data)
+    // Send LOWER nibble second (RS=1 for data)
     LCD_SendNibble((data << 4) & 0xF0, 0x01);
-    SysCtlDelay(SysCtlClockGet() / 90000); // Wait after data
+    SysCtlDelay(SysCtlClockGet() / g_LCDNibbleDelayFactor); // Wait after data
 }
 
 /**
  * @brief Initializes the 2004A LCD display.
  */
 void LCD_Init() {
-    SysCtlDelay(SysCtlClockGet() / 3); // Wait for power-up (~100ms)
+    SysCtlDelay(SysCtlClockGet() / 10); // Wait for power-up (~300ms)
 
     // Send reset commands in 8-bit mode (first 3 times)
+    // Note: These are sent as 4-bit "nibbles" but act as 8-bit commands for init
     LCD_SendNibble(0x30, 0x00); // Function Set (8-bit interface)
-    SysCtlDelay(SysCtlClockGet() / 90000);
+    SysCtlDelay(SysCtlClockGet() / 30000); // Longer delay after each nibble
     LCD_SendNibble(0x30, 0x00); // Function Set (8-bit interface)
-    SysCtlDelay(SysCtlClockGet() / 90000);
+    SysCtlDelay(SysCtlClockGet() / 30000);
     LCD_SendNibble(0x30, 0x00); // Function Set (8-bit interface)
-    SysCtlDelay(SysCtlClockGet() / 90000);
+    SysCtlDelay(SysCtlClockGet() / 30000);
 
     LCD_SendNibble(0x20, 0x00); // Set to 4-bit interface
-    SysCtlDelay(SysCtlClockGet() / 90000);
+    SysCtlDelay(SysCtlClockGet() / 30000);
 
     LCD_SendCommand(0x28); // Function Set: 4-bit, 2 lines, 5x8 dots
     LCD_SendCommand(0x0C); // Display ON, Cursor OFF, Blink OFF
     LCD_SendCommand(0x06); // Entry Mode Set: Increment cursor, no display shift
     LCD_SendCommand(0x01); // Clear Display
-    SysCtlDelay(SysCtlClockGet() / 3); // Wait for clear to finish (long delay needed)
+    SysCtlDelay(SysCtlClockGet() / 10); // Wait for clear to finish (longer delay)
 }
 
 /**
@@ -269,7 +297,10 @@ void GPIOCIntHandler(void) {
     }
 
     LCD_SendCommand(0x01); // Clear display
-    SysCtlDelay(SysCtlClockGet() / 90000); // Small delay for clear to take effect
+    // IMPORTANT: Longer delay required for clear display command to complete (~2ms)
+    SysCtlDelay(SysCtlClockGet() / 500); // 50 MHz / 500 = 100,000 cycles, approx 2ms
+                                         // (50MHz / 500 = 100,000 cycles for 2ms)
+                                         // (50MHz / 30000 in your code was ~0.6ms, might be too short)
 
     // Set cursor to the first line, first column
     LCD_SendCommand(0x80);
@@ -348,6 +379,9 @@ int main(void) {
     TimerIntEnable(TIMER0_BASE, TIMER_TIMA_TIMEOUT); // Enable timeout interrupt
     TimerEnable(TIMER0_BASE, TIMER_A);               // Start timer
 
+    // Enable global interrupts
+    IntMasterEnable();
+
     // Initialize the LCD display
     LCD_Init();
 
@@ -357,12 +391,10 @@ int main(void) {
     LCD_SendCommand(0xC0); // Set cursor to second line
     LCD_PrintString("Waiting for clock...");
 
-    // Enable global interrupts
-    IntMasterEnable();
-
     // Main loop: all work is interrupt-driven
     while (1) {
         // Optionally, enter sleep mode to save power between interrupts
         // SysCtlSleep();
     }
 }
+
