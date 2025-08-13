@@ -448,6 +448,15 @@ int main(void) {
 
     // Main loop: all work is interrupt-driven
     while (1) {
+        // Poll UART0 for received characters
+        if (UARTCharsAvail(UART0_BASE)) {
+            char c = UARTCharGet(UART0_BASE);
+            if (c == 'R' || c == 'r') {
+                // Software reset using NVIC APINT register (TivaWare)
+                HWREG(0xE000ED0C) = 0x05FA0004;
+                while (1); // Wait for reset
+            }
+        }
         // Optionally, enter sleep mode to save power between interrupts
         // SysCtlSleep();
     }
