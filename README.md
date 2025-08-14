@@ -1,10 +1,10 @@
-# ⏰🔗 Clock2UART: Microsecond Timestamp Logger for TM4C123 🚀
+# ⏰🔗 Clock2UART: Microsecond Timestamp Logger for TM4C123 🚀✨
 
 ---
 
 ## ✨ Overview
 
-Welcome to **Clock2UART**! This project transforms your TM4C123 microcontroller into a high-precision event logger, outputting microsecond timestamps over UART every time a clock pulse is detected on PC4. Perfect for timing, debugging, and embedded experiments! 😎
+Welcome to **Clock2UART**! This project transforms your TM4C123 microcontroller into a high-precision event logger, outputting microsecond timestamps over UART every time a clock pulse is detected on PC4. Perfect for timing, debugging, and embedded experiments! 😎🔬
 
 ---
 
@@ -14,6 +14,7 @@ Welcome to **Clock2UART**! This project transforms your TM4C123 microcontroller 
 - 🎯 **Event Triggered:** Each rising edge on PC4 sends the current timestamp over UART0.
 - 📨 **UART Output:** Timestamps are sent as ASCII decimal numbers, followed by CR+LF (`\r\n`) for easy logging or parsing.
 - 💤 **Minimal CPU Usage:** All timing and event handling is interrupt-driven for efficiency.
+- 🖥️ **LCD Display:** Real-time visualization of timestamps and trigger counts on a 2004A LCD.
 
 ---
 
@@ -44,7 +45,7 @@ Welcome to **Clock2UART**! This project transforms your TM4C123 microcontroller 
 2. 🔗 **Connect** your clock signal to PC4.
 3. 🖥️ **Open a serial terminal** (115200 baud, 8N1, no flow control) on your PC.
 4. ⏱️ **Watch the magic!** Each rising edge on PC4 prints the current microsecond count on a new line.
-5. (Optional) **Connect an LCD** as per the hardware setup to view timestamps and trigger counts in real-time.
+5. 🖥️ **Connect an LCD** as per the hardware setup to view timestamps and trigger counts in real-time.
 
 > 💡 **Tip:** Use any serial terminal (e.g., PuTTY, Tera Term, minicom) to view the output.
 
@@ -71,7 +72,7 @@ Dung Duc Phan, August 2025
 ---
 
 <div align="center">
-	<sub>Made with ❤️ for embedded developers and tinkerers everywhere!</sub>
+	<sub>Made with ❤️ for embedded developers and tinkerers everywhere! 🛠️✨</sub>
 </div>
 
 ---
@@ -79,7 +80,7 @@ Dung Duc Phan, August 2025
 ## 🖥️ New Feature: LCD Display
 
 ### Overview
-This feature adds support for displaying timestamps and trigger counts on a 2004A LCD module with a PCF8574 I2C controller. The LCD provides a real-time view of the microsecond counter and the number of rising edges detected on PC4.
+This feature adds support for displaying timestamps and trigger counts on a 2004A LCD module with a PCF8574 I2C controller. The LCD provides a real-time view of the microsecond counter and the number of rising edges detected on PC4. 🎉
 
 ### Hardware Setup
 - **LCD Module:** 2004A with PCF8574 I2C backpack.
@@ -102,7 +103,7 @@ This feature adds support for displaying timestamps and trigger counts on a 2004
 ## 🆕 New Features
 
 ### Enhanced UART Output
-- The firmware now prints both the **timestamp** and the **trigger count** to the UART.
+- The firmware now prints both the **timestamp** and the **trigger count** to the UART. 🖨️
 - Example output:
   ```
   12345678 42
@@ -111,7 +112,7 @@ This feature adds support for displaying timestamps and trigger counts on a 2004
   ```
 
 ### Reset Trigger Count via UART
-- The firmware can now receive a string via UART to reset the trigger count.
+- The firmware can now receive a string via UART to reset the trigger count. 🔄
 - To reset the trigger count, send the string `reset` to the board.
 
 ---
@@ -119,26 +120,26 @@ This feature adds support for displaying timestamps and trigger counts on a 2004
 ## 🐍 Python Client
 
 A Python client script (`control_client.py`) is included to interact with the firmware. This script allows you to:
-- **Read UART Output**: Continuously read and display data from the board.
-- **Send Commands**: Send strings to the board, such as `reset` to reset the trigger count.
+- **Read UART Output**: Continuously read and display data from the board. 📡
+- **Send Commands**: Send strings to the board, such as `reset` to reset the trigger count. 🖋️
 
 ### Usage Instructions
 1. **Install Python**:
-   - Ensure Python 3.x is installed on your system.
+   - Ensure Python 3.x is installed on your system. 🐍
    - Install the `pyserial` library if not already installed:
      ```
      pip install pyserial
      ```
 
 2. **Run the Script**:
-   - Navigate to the `PythonClient` directory.
+   - Navigate to the `PythonClient` directory. 📂
    - Run the script:
      ```
      python control_client.py
      ```
 
 3. **Interact with the Board**:
-   - View the UART output in real-time.
-   - Type `reset` to reset the trigger count or any other string to send it to the board.
+   - View the UART output in real-time. 🖥️
+   - Type `reset` to reset the trigger count or any other string to send it to the board. ✍️
 
 > 💡 **Tip**: Update the `PORT` variable in the script to match your board's COM port.
