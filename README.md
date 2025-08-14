@@ -98,3 +98,47 @@ This feature adds support for displaying timestamps and trigger counts on a 2004
 > **Note:** The LCD backlight is enabled by default. Adjust the `PCF8574_BL` definition in the code to disable it if needed.
 
 ---
+
+## 🆕 New Features
+
+### Enhanced UART Output
+- The firmware now prints both the **timestamp** and the **trigger count** to the UART.
+- Example output:
+  ```
+  12345678 42
+  12345679 43
+  ...
+  ```
+
+### Reset Trigger Count via UART
+- The firmware can now receive a string via UART to reset the trigger count.
+- To reset the trigger count, send the string `reset` to the board.
+
+---
+
+## 🐍 Python Client
+
+A Python client script (`control_client.py`) is included to interact with the firmware. This script allows you to:
+- **Read UART Output**: Continuously read and display data from the board.
+- **Send Commands**: Send strings to the board, such as `reset` to reset the trigger count.
+
+### Usage Instructions
+1. **Install Python**:
+   - Ensure Python 3.x is installed on your system.
+   - Install the `pyserial` library if not already installed:
+     ```
+     pip install pyserial
+     ```
+
+2. **Run the Script**:
+   - Navigate to the `PythonClient` directory.
+   - Run the script:
+     ```
+     python control_client.py
+     ```
+
+3. **Interact with the Board**:
+   - View the UART output in real-time.
+   - Type `reset` to reset the trigger count or any other string to send it to the board.
+
+> 💡 **Tip**: Update the `PORT` variable in the script to match your board's COM port.
